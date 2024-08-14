@@ -7,7 +7,7 @@ pacman::p_load(
   ,openxlsx
   ,zipangu
   ,tidyverse
-  ,tidylog
+  # ,tidylog
 )
 
 ################################################################################
@@ -17,12 +17,16 @@ today_ymd <- str_replace_all(Sys.Date(),'-','') %>% print()
 output_dir <- here(str_glue('output/{today_ymd}')) %>% print()
 original_dir <- here(str_glue('{output_dir}/original')) %>% print()
 
-# output_dirの初期化
-if (dir.exists(output_dir)) {
+# 書き込み権限を変更
+system(paste("sudo chmod -R 777", output_dir))
+
+# 初期化
+if (dir.exists(output_dir)){
+  # output_dirを一旦削除して初期化
   unlink(output_dir, recursive = TRUE)
 }
 
-# original_dirの作成
+# original_dirをrecursiveで作成
 if (!dir.exists(original_dir)) {
   dir.create(original_dir,recursive = TRUE)
 }
@@ -45,7 +49,7 @@ df_kouseikyoku <- dplyr::tibble(
 #東北、関東信越、近畿、中国、四国の関数
 get_sisetukijun1<- function(district, url, a_contains){
   
-  output_dir1 <- str_glue('{original_dir}/{district}') %>% print()
+  output_dir1 <- str_glue('{original_dir}/{district}') 
   
   if (!dir.exists(output_dir1)) {
     dir.create(output_dir1)
@@ -317,12 +321,18 @@ unlink(target_dir, recursive = TRUE)
 
 ################################################################################
 
+# TODO 手動でrds出力をやりなおしする場合
+# output_dir <- 'output/20240807'
+# original_dir <- 'output/20240807/original'
+
+################################################################################
+
 # ファイル一覧
-files <- list.files(original_dir, full.names = TRUE, recursive = TRUE,pattern = '.xlsx$') %>% print()
+files <- list.files(original_dir, full.names = TRUE, recursive = TRUE,pattern = '.xlsx$') 
 
 # 関数テスト用
-file <- files[1]
-sheet <- 'Sheet1'
+# file <- files[1]
+# sheet <- 'Sheet1'
 
 # 読み込み用関数
 read_sisetukijun_xlsx<- function(file, sheet){
@@ -335,69 +345,69 @@ df_file <- dplyr::tibble(file = files) %>%
   mutate(get_date = str_extract(file, 'output/[0-9]{8}')) %>% 
   mutate(get_date = str_extract(get_date, '[0-9]{8}')) %>% 
   mutate(get_date = ymd(get_date)) %>% 
-  mutate(sheet = map(file, getSheetNames)) %>%
-  unnest(cols = c(sheet)) %>%
-  print()
+  mutate(sheet = map(file, openxlsx::getSheetNames)) %>%
+  unnest(cols = c(sheet)) 
 
 # データの読み込み
 df_file <- df_file %>% 
-  mutate(data = map2(file, sheet, read_sisetukijun_xlsx)) %>%
-  print()
+  mutate(data = map2(file, sheet, read_sisetukijun_xlsx)) 
 
 # dataにdate列を追加
 df_file <- df_file %>% 
-  mutate(data = map2(data, get_date, ~mutate(.x, get_date = .y))) %>% 
-  print()
+  mutate(data = map2(data, get_date, ~mutate(.x, get_date = .y))) 
 
 # データを結合
 df_all <- df_file %>% 
   select(data) %>% 
-  unnest(cols = c(data)) %>% 
-  print()
+  unnest(cols = c(data)) 
+
+# 算定開始日の不正データを発見→厚生局に問い合わせをしたら2024/7/1版で修正するとのこと。
+# 2024/6/1版は手直しするしかなくなった。
+df_all <- df_all %>% 
+  mutate(算定開始年月日 = case_when(
+    get_date <= ymd(20240831) & str_detect(算定開始年月日, "令和30年 6月 1日") ~ "令和 6年 6月 1日"
+    ,T  ~ 算定開始年月日
+  )) 
 
 # 算定開始年月日を西暦に変換
 df_all <- df_all %>% 
-  mutate(西暦算定開始年月日 = zipangu::convert_jdate(str_replace_all(算定開始年月日, " ", "")),.after=算定開始年月日) %>% 
-  glimpse()
-
-# 西暦変換によるNAが発生していないことを確認
-df_all %>% 
-  filter(is.na(西暦算定開始年月日),!is.na(算定開始年月日)) %>% 
-  glimpse()
-
+  mutate(西暦算定開始年月日 = zipangu::convert_jdate(str_replace_all(算定開始年月日, " ", "")),.after=算定開始年月日) 
+  
+# # 西暦変換によるNAが発生していないことを確認
+# df_all %>% 
+#   filter(is.na(西暦算定開始年月日),!is.na(算定開始年月日)) 
 
 ################################################################################
 
 # 医療機関コードを作成
 df_all <- df_all %>% 
-  mutate(医療機関コード = str_glue('{都道府県コード}1{医療機関番号}'),.before=都道府県コード) %>%
-  print()
+  mutate(医療機関コード = str_glue('{都道府県コード}1{医療機関番号}'),.before=都道府県コード) 
 
 ################################################################################
 
 # 県ごとに最大の算定開始年月日を計算して出力
-pref_update_date<- df_all %>% 
+pref_update_date <- df_all %>% 
   group_by(都道府県コード,都道府県名) %>%
   summarise(update_date = max(西暦算定開始年月日,na.rm = T)) %>%
-  ungroup() %>% 
-  print()
+  ungroup() 
 
 # Excelで書き出し
 pref_update_date %>% 
   writexl::write_xlsx(str_glue('{output_dir}/pref_update_date.xlsx'))
 
+# pref_update_date %>% 
+#   filter(都道府県名=='埼玉県')
+
+################################################################################
+
 # df_allにupdate_dateを追加
 df_all <- df_all %>% 
-  left_join(pref_update_date, by = c('都道府県コード','都道府県名')) %>% 
-  glimpse()
+  left_join(pref_update_date, by = c('都道府県コード','都道府県名')) 
 
 # 生成物をrds出力
 df_all %>% saveRDS(str_glue('{output_dir}/df_all.rds'))
 
-df_all %>% 
-  glimpse()
-
 ################################################################################
 
-df_all %>% 
-  summarise(医療機関数 = n_distinct(医療機関番号))
+print(data.frame(pref_update_date))
+
