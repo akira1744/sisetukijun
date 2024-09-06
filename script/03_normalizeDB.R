@@ -87,6 +87,7 @@ for (select_date in update_dates$update_date){
       update_date
       ,医療機関コード
       # ,都道府県コード
+      ,厚生局
       ,都道府県名
       # ,区分
       # ,医療機関番号

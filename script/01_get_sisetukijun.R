@@ -264,6 +264,8 @@ links <- web_page %>% html_nodes("a:contains('エクセルデータ（ZIP）')")
 # 最新ファイル判定のための正規表現を作成
 latest_prefix <- max(gsub("^.*/([^_]+_[0-9]+)_.*$", "\\1", links))
 
+latest_prefix
+
 # ダウンロードディレクトリを設定します
 download_dir <- "downloads"
 if (!dir.exists(download_dir)) {
@@ -322,8 +324,8 @@ unlink(target_dir, recursive = TRUE)
 ################################################################################
 
 # TODO 手動でrds出力をやりなおしする場合
-# output_dir <- 'output/20240807'
-# original_dir <- 'output/20240807/original'
+# output_dir <- 'output/20240829'
+# original_dir <- 'output/20240829/original'
 
 ################################################################################
 
@@ -348,6 +350,13 @@ df_file <- dplyr::tibble(file = files) %>%
   mutate(sheet = map(file, openxlsx::getSheetNames)) %>%
   unnest(cols = c(sheet)) 
 
+# ファイル名から厚生局を取得
+df_file <- df_file %>% 
+  mutate(厚生局 = str_replace(file,original_dir,'')) %>% 
+  mutate(厚生局 = str_replace(厚生局,'^/','')) %>% #先頭の/を削除
+  mutate(厚生局 = str_replace(厚生局,'/.*','')) %>% # /以降を削除
+  print()
+
 # データの読み込み
 df_file <- df_file %>% 
   mutate(data = map2(file, sheet, read_sisetukijun_xlsx)) 
@@ -356,10 +365,16 @@ df_file <- df_file %>%
 df_file <- df_file %>% 
   mutate(data = map2(data, get_date, ~mutate(.x, get_date = .y))) 
 
+# dataに厚生局列を追加
+df_file <- df_file %>% 
+  mutate(data = map2(data, 厚生局, ~mutate(.x, 厚生局 = .y))) 
+
 # データを結合
 df_all <- df_file %>% 
   select(data) %>% 
   unnest(cols = c(data)) 
+
+df_all %>% glimpse()
 
 # 算定開始日の不正データを発見→厚生局に問い合わせをしたら2024/7/1版で修正するとのこと。
 # 2024/6/1版は手直しするしかなくなった。
@@ -369,13 +384,35 @@ df_all <- df_all %>%
     ,T  ~ 算定開始年月日
   )) 
 
+
+################################################################################
+
 # 算定開始年月日を西暦に変換
+# df_all <- df_all %>% 
+#   mutate(西暦算定開始年月日 = zipangu::convert_jdate(str_replace_all(算定開始年月日, " ", "")),.after=算定開始年月日) 
+
+################################################################################
+
+# 西暦変換は時間がかかるので、一旦ユニークを取得してから変換しjoinする
+
+# 算定開始年月日のスペース削除
 df_all <- df_all %>% 
-  mutate(西暦算定開始年月日 = zipangu::convert_jdate(str_replace_all(算定開始年月日, " ", "")),.after=算定開始年月日) 
-  
+  mutate(算定開始年月日 = str_replace_all(算定開始年月日, " ", "")) 
+
+# 算定開始年月日のユニークを取得して西暦変換  
+santei_kaisi_mst <- df_all %>% 
+  distinct(算定開始年月日) %>%
+  mutate(西暦算定開始年月日 = zipangu::convert_jdate(算定開始年月日)) %>% 
+  print()
+
+# 結合
+df_all <- df_all %>% 
+  left_join(santei_kaisi_mst, by='算定開始年月日') %>%
+  glimpse()
+
 # # 西暦変換によるNAが発生していないことを確認
-# df_all %>% 
-#   filter(is.na(西暦算定開始年月日),!is.na(算定開始年月日)) 
+# df_all %>%
+#   filter(is.na(西暦算定開始年月日),!is.na(算定開始年月日))
 
 ################################################################################
 
@@ -385,29 +422,39 @@ df_all <- df_all %>%
 
 ################################################################################
 
-# 県ごとに最大の算定開始年月日を計算して出力
-pref_update_date <- df_all %>% 
-  group_by(都道府県コード,都道府県名) %>%
-  summarise(update_date = max(西暦算定開始年月日,na.rm = T)) %>%
-  ungroup() 
-
-# Excelで書き出し
-pref_update_date %>% 
-  writexl::write_xlsx(str_glue('{output_dir}/pref_update_date.xlsx'))
-
+# # 県ごとに最大の算定開始年月日を計算して出力
+# pref_update_date <- df_all %>% 
+#   group_by(都道府県コード,都道府県名) %>%
+#   summarise(update_date = max(西暦算定開始年月日,na.rm = T)) %>%
+#   ungroup() 
+# 
+# # Excelで書き出し
 # pref_update_date %>% 
-#   filter(都道府県名=='埼玉県')
+#   writexl::write_xlsx(str_glue('{output_dir}/pref_update_date.xlsx'))
+
+
+################################################################################
+
+# # 厚生局ごとに最大の算定開始年月日を計算して出力
+kouseikyoku_update_date <- df_all %>%
+  group_by(厚生局) %>%
+  summarise(update_date = max(西暦算定開始年月日,na.rm = T)) %>%
+  ungroup()
+ 
+# # Excelで書き出し
+kouseikyoku_update_date %>%
+  writexl::write_xlsx(str_glue('{output_dir}/kouseikyoku_update_date.xlsx'))
 
 ################################################################################
 
 # df_allにupdate_dateを追加
 df_all <- df_all %>% 
-  left_join(pref_update_date, by = c('都道府県コード','都道府県名')) 
+  left_join(kouseikyoku_update_date, by = c('厚生局')) 
 
 # 生成物をrds出力
 df_all %>% saveRDS(str_glue('{output_dir}/df_all.rds'))
 
 ################################################################################
 
-print(data.frame(pref_update_date))
+print(data.frame(kouseikyoku_update_date))
 

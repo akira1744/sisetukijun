@@ -67,6 +67,12 @@ for(file in target_files){
 
 ################################################################################
 
+# update_dateが同じでget_dateが異なるデータが複数あるので、
+# update_dateが同じデータの中で、get_dateが最も新しいものを残すことにする
+# 全データをメモリに乗せることができないので、update_date毎に処理する
+
+################################################################################
+
 # update_dateの一覧を取得
 all_update_date_df <- tbl(all_db_con, 'sisetukijun_all_get_date') %>% 
   distinct(update_date) %>% 
@@ -75,7 +81,7 @@ all_update_date_df <- tbl(all_db_con, 'sisetukijun_all_get_date') %>%
 
 ################################################################################
 
-# sisetukijun_all_update_dateが存在したら削除
+# sisetukijun_all_update_dateが存在したら削除(このテーブルは毎回すべてやり直す)
 DBI::dbExecute(all_db_con,'DROP TABLE IF EXISTS sisetukijun_all_update_date;')
 
 ################################################################################
@@ -88,7 +94,7 @@ for (select_date in all_update_date_df$update_date){
   # update_dateの中でget_dateが最新のdataを取得
   tmp <- tbl(all_db_con, 'sisetukijun_all_get_date') %>% 
     filter(update_date == select_date) %>% 
-    group_by(update_date,都道府県コード) %>%
+    group_by(update_date,厚生局) %>%
     filter(get_date == max(get_date,na.rm=T)) %>% 
     ungroup() %>%
     collect()
