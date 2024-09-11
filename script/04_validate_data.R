@@ -3,7 +3,8 @@ rm(list=ls())
 pacman::p_load(
   here
   ,DBI
-  ,RSQLite
+  ,duckdb
+  ,duckplyr
   ,writexl
   ,lubridate
   ,tidyverse
@@ -15,49 +16,24 @@ output_dir <- here('output') %>% print()
 ################################################################################
 
 # すべてのrdsを格納するdb
-all_db_path <- str_glue('sisetukijun_all.sqlite') %>% print()
+all_db_path <- here('sisetukijun_all.duckdb') %>% print()
 
-# sqliteにconnect
-all_db_con <- DBI::dbConnect(RSQLite::SQLite(), all_db_path) 
+# connect
+all_db_con <- dbConnect(duckdb(),all_db_path,read_only=FALSE)
 
 # table一覧を確認
 all_db_tables <- DBI::dbListTables(all_db_con) %>% print()
 
 ################################################################################
 
-# すべてのrdsを格納するdb
-db_path <- str_glue('sisetukijun.sqlite') %>% print()
+# normalize後のdataを格納するdb
+db_path <- here('sisetukijun.duckdb') %>% print()
 
-# sqliteにconnect
-db_con <- DBI::dbConnect(RSQLite::SQLite(), db_path) 
+# connect
+con <- dbConnect(duckdb(),db_path,read_only=FALSE)
 
 # table一覧を確認
-db_tables <- DBI::dbListTables(db_con) %>% print()
-
-################################################################################
-
-# 厚生局ごとにいつのデータが入っているかのデータを作る
-kouseikyoku_update_date <- tbl(db_con,'mst_sisetu') %>% 
-  distinct(厚生局,update_date) %>% 
-  collect() 
-
-# 厚生局を縦,年月を横に展開
-agg_kouseikyoku_update_date <- kouseikyoku_update_date %>% 
-  mutate(年月 = str_sub(str_replace_all(update_date,'-',''),1,6)) %>%
-  mutate(cnt=1) %>% 
-  arrange(年月) %>% 
-  pivot_wider(
-    id_cols='厚生局'
-    ,names_from='年月'
-    ,values_from='cnt'
-    ,values_fill=0) %>% 
-  arrange(厚生局) 
-
-# 出力
-agg_kouseikyoku_update_date %>% 
-  write_xlsx('DB格納データ一覧.xlsx')
-
-system("sudo chmod 666 DB格納データ一覧.xlsx")
+db_tables <- DBI::dbListTables(con) %>% print()
 
 ################################################################################
 
@@ -73,3 +49,4 @@ print(str_glue('不正データチェック: 算定開始年月日 > get_date: {
 ################################################################################
 
 DBI::dbDisconnect(all_db_con)
+DBI::dbDisconnect(con)

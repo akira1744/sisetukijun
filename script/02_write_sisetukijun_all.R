@@ -3,32 +3,39 @@ rm(list=ls())
 pacman::p_load(
   here
   ,DBI
-  ,RSQLite
   ,writexl
   ,lubridate
+  ,duckdb
+  ,duckplyr
   ,tidyverse
-  # ,tidylog
+  ,tidylog
 )
+
 ################################################################################
 
-output_dir <- here('output')
+output_dir <- here('output') %>% print()
 
 # すべてのrdsを格納するdb
-all_db_path <- here('sisetukijun_all.sqlite') 
+all_db_path <- 'sisetukijun_all.duckdb'
 
-# sqliteにconnect
-all_db_con <- DBI::dbConnect(RSQLite::SQLite(), all_db_path) 
+# すべてのget_dateのdataを格納するDBを用意
+all_db_con <- DBI::dbConnect(duckdb::duckdb(),all_db_path,read_only=FALSE)
 
 # 書き込み権限を変更
 system(paste("sudo chmod -R 666", all_db_path))
 
 # table一覧を確認
-all_db_tables <- DBI::dbListTables(all_db_con) 
+all_db_tables <- DBI::dbListTables(all_db_con) %>% print()
 
 ################################################################################
 
 # 読み込みファイル一覧
-target_files <- list.files(output_dir, full.names = TRUE,pattern = 'df_all.rds',recursive = TRUE) %>% 
+target_files <- list.files(
+  output_dir
+  ,full.names = TRUE
+  ,pattern = 'df_all.rds'
+  ,recursive = TRUE
+  ) %>% 
   print()
 
 # sisetukijun_all_get_dateが存在したら
@@ -62,8 +69,39 @@ for(file in target_files){
     mutate(across(where(~ inherits(.x,'Date')), ~ as.character(.x))) 
   
   # tmpテーブルに書き込み
-  DBI::dbWriteTable(all_db_con, 'sisetukijun_all_get_date', df_all, append = TRUE) %>% print()
+  DBI::dbWriteTable(all_db_con, 'sisetukijun_all_get_date', df_all, append = TRUE)
 }
+
+################################################################################
+
+# indexがなくても十分早いし、indexの作成は時間がかかるのでアプリで使う部分だけにする。
+
+################################################################################
+
+
+# sisetukijun_all_get_dateのupdate_date列にindexを作成（存在しない場合のみ）
+
+# idx_name <- 'idx_sisetukijun_all_get_date_update_date'
+# 
+# query <- str_glue(
+#   'CREATE INDEX {idx_name} ON sisetukijun_all_get_date(update_date);'
+#   )
+# 
+# start_time <- proc.time()
+# 
+# # すでにindex tableが存在するとErrorが発生するのでerror処理
+# result <- tryCatch({
+#   DBI::dbExecute(all_db_con, query)
+#   message(str_glue('インデックス{idx_name}を新規作成しました。'))
+#   TRUE
+# }, error = function(e) {
+#   message(str_glue('インデックス{idx_name}の新規作成に失敗しました。エラー: {e$message}'))
+#   FALSE
+# })
+# 
+# end_time <- proc.time()
+# elapsed_time <- end_time - start_time
+# message(glue('処理にかかった時間: {elapsed_time[3]} 秒'))
 
 ################################################################################
 
@@ -77,6 +115,7 @@ for(file in target_files){
 all_update_date_df <- tbl(all_db_con, 'sisetukijun_all_get_date') %>% 
   distinct(update_date) %>% 
   collect() %>% 
+  arrange(update_date) %>% 
   print()
 
 ################################################################################
@@ -100,7 +139,7 @@ for (select_date in all_update_date_df$update_date){
     collect()
   
   # sisetukijun_allテーブルに書き込む
-  DBI::dbWriteTable(all_db_con, 'sisetukijun_all_update_date', tmp, append = TRUE) %>% print()
+  DBI::dbWriteTable(all_db_con, 'sisetukijun_all_update_date', tmp, append = TRUE) 
 }
 
 ################################################################################
@@ -109,3 +148,6 @@ for (select_date in all_update_date_df$update_date){
 DBI::dbDisconnect(all_db_con)
 
 ################################################################################
+
+# 完了
+message('02_write_sisetukijun_all.Rが完了しました。')
