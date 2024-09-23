@@ -27,7 +27,8 @@ system(paste("sudo chmod -R 777", output_dir))
 original_dir <- here(str_glue('{output_dir}/original')) %>% print()
 
 # ファイル一覧
-files <- list.files(original_dir, full.names = TRUE, recursive = TRUE,pattern = '.xlsx$') 
+files <- list.files(original_dir, full.names = TRUE, recursive = TRUE,pattern = '.xlsx$') %>% 
+  print()
 
 # 関数テスト用
 # file <- files[1]
@@ -38,6 +39,12 @@ read_sisetukijun_xlsx<- function(file, sheet){
   readxl::read_excel(file, skip=3, sheet = sheet,col_types='text') %>% 
     tibble() 
 }
+
+dplyr::tibble(file = files) %>% 
+  mutate(sheet = map(file, openxlsx::getSheetNames)) %>% 
+  unnest(cols = c(sheet)) %>% 
+  mutate(data = map2(file, sheet, read_sisetukijun_xlsx)) %>% 
+  unnest(cols = c(data)) 
 
 #ダウンロードしたファイルを読み込む準備
 df_file <- dplyr::tibble(file = files) %>% 

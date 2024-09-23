@@ -467,6 +467,8 @@ update_notice <- update_notice %>%
   distinct(get_date,message) %>% 
   print()
 
+system("sudo chmod 666 更新状況.xlsx")
+
 # 厚生局別_update_date一覧を出力
 list(
   '更新通知'=update_notice
@@ -474,7 +476,6 @@ list(
   ) %>% 
   writexl::write_xlsx('更新状況.xlsx')
 
-system("sudo chmod 666 更新状況.xlsx")
 
 # update_noticeをdbに書き込み
 DBI::dbWriteTable(con, 'update_notice', update_notice, overwrite=T) %>% print()

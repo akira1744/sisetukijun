@@ -71,75 +71,42 @@ for(file in target_files){
   # tmpテーブルに書き込み
   DBI::dbWriteTable(all_db_con, 'sisetukijun_all_get_date', df_all, append = TRUE)
 }
-
 ################################################################################
-
-# indexがなくても十分早いし、indexの作成は時間がかかるのでアプリで使う部分だけにする。
-
-################################################################################
-
-
-# sisetukijun_all_get_dateのupdate_date列にindexを作成（存在しない場合のみ）
-
-# idx_name <- 'idx_sisetukijun_all_get_date_update_date'
-# 
-# query <- str_glue(
-#   'CREATE INDEX {idx_name} ON sisetukijun_all_get_date(update_date);'
-#   )
-# 
-# start_time <- proc.time()
-# 
-# # すでにindex tableが存在するとErrorが発生するのでerror処理
-# result <- tryCatch({
-#   DBI::dbExecute(all_db_con, query)
-#   message(str_glue('インデックス{idx_name}を新規作成しました。'))
-#   TRUE
-# }, error = function(e) {
-#   message(str_glue('インデックス{idx_name}の新規作成に失敗しました。エラー: {e$message}'))
-#   FALSE
-# })
-# 
-# end_time <- proc.time()
-# elapsed_time <- end_time - start_time
-# message(glue('処理にかかった時間: {elapsed_time[3]} 秒'))
-
-################################################################################
-
-# update_dateが同じでget_dateが異なるデータが複数あるので、
-# update_dateが同じデータの中で、get_dateが最も新しいものを残すことにする
-# 全データをメモリに乗せることができないので、update_date毎に処理する
-
-################################################################################
-
-# update_dateの一覧を取得
-all_update_date_df <- tbl(all_db_con, 'sisetukijun_all_get_date') %>% 
-  distinct(update_date) %>% 
-  collect() %>% 
-  arrange(update_date) %>% 
-  print()
 
 ################################################################################
 
 # sisetukijun_all_update_dateが存在したら削除(このテーブルは毎回すべてやり直す)
 DBI::dbExecute(all_db_con,'DROP TABLE IF EXISTS sisetukijun_all_update_date;')
 
+
 ################################################################################
 
-# update_dateをループ処理
-for (select_date in all_update_date_df$update_date){
+# 厚生局ごとのupdate_dateと最新のget_dateを取得
+max_get_date_df <- tbl(all_db_con, 'sisetukijun_all_get_date') %>% 
+  group_by(厚生局,update_date) %>% 
+  summarise(max_get_date = max(get_date,na.rm=T)) %>% 
+  ungroup() %>% 
+  collect() %>% 
+  print()
+
+# 1行ごとループして、dbに書き込み
+for (i in 1:nrow(max_get_date_df)){
   
-  print(select_date)
+  target_kouseikyoku <- max_get_date_df$厚生局[i] 
+  target_update_date <- max_get_date_df$update_date[i]
+  target_get_date <- max_get_date_df$max_get_date[i]
   
-  # update_dateの中でget_dateが最新のdataを取得
   tmp <- tbl(all_db_con, 'sisetukijun_all_get_date') %>% 
-    filter(update_date == select_date) %>% 
-    group_by(update_date,厚生局) %>%
-    filter(get_date == max(get_date,na.rm=T)) %>% 
-    ungroup() %>%
+    filter(
+      厚生局 == target_kouseikyoku
+      ,update_date == target_update_date
+      ,get_date == target_get_date
+    ) %>% 
     collect()
   
   # sisetukijun_allテーブルに書き込む
   DBI::dbWriteTable(all_db_con, 'sisetukijun_all_update_date', tmp, append = TRUE) 
+  rm(tmp)
 }
 
 ################################################################################
