@@ -56,7 +56,7 @@ sample %>% names() %>% dput()
 
 # update_dateのマスタを作成する
 mst_update_date <- tbl(all_db_con, 'sisetukijun_all_update_date') %>% 
-  distinct(update_date) %>% 
+  distinct(update_date,厚生局) %>% 
   collect() %>% 
   arrange(update_date) %>%
   print()
@@ -126,10 +126,6 @@ DBI::dbWriteTable(con, 'mst_syubetu', mst_syubetu, overwrite=T) %>% print()
 
 ################################################################################
 
-
-################################################################################
-
-
 # 届出マスタを作成
 mst_todokede <- tbl(all_db_con, 'sisetukijun_all_update_date') %>%
   distinct(受理届出名称) %>%
@@ -144,24 +140,6 @@ mst_todokede <- bind_rows(tmp, mst_todokede) %>% print()
 
 # dbに書き込み
 DBI::dbWriteTable(con, 'mst_todokede', mst_todokede, overwrite=T) %>% print()
-
-################################################################################
-
-# # mst_todokedeに点数本のコードを結合できるか検証
-# mst_tensu <- readxl::read_excel('input/医科診療行為マスター.xlsx',col_types = 'text')
-# mst_tensu %>% glimpse()
-# mst_tensu <- mst_tensu %>% 
-#   filter(年度=='2024')
-# 
-# tmp <- mst_todokede %>% 
-#   left_join(mst_tensu,by=c('受理届出名称'='基本漢字名称')) %>% 
-#   left_join(mst_tensu,by=c('受理届出名称'='省略漢字名称')) %>% 
-#   glimpse()
-# 
-# tmp %>% 
-#   writexl::write_xlsx('tmp/施設基準_点数マスタ結合チェック.xlsx')
-# 
-# # 結論→全然ダメ。特定集中治療すらマッチしていない。あきらめる
 
 ################################################################################
 
@@ -210,23 +188,6 @@ mst_sisetu_name <- mst_sisetu_name %>%
   )) %>%
   print()
 
-# 確認用
-# mst_sisetu_name %>%
-#   filter(dpl_医療機関名称_都道府県名_住所 > 1) %>%
-#   arrange(施設名) %>%
-#   View()
-# 
-# mst_sisetu_name %>% 
-#   filter(dpl_医療機関名称_都道府県名_住所 == 1) %>% 
-#   filter(dpl_医療機関名称_都道府県名 > 1) %>% 
-#   View()
-# 
-# mst_sisetu_name %>% 
-#   filter(dpl_医療機関名称_都道府県名_住所 == 1) %>% 
-#   filter(dpl_医療機関名称_都道府県名 == 1) %>% 
-#   filter(dpl_医療機関名称 > 1) %>% 
-#   View()
-
 # 施設名でユニークになることを確認
 mst_sisetu_name %>% 
   group_by(施設名) %>%
@@ -245,6 +206,7 @@ dbWriteTable(con, 'mst_sisetu_name', mst_sisetu_name, overwrite = T)
 update_dates <- tbl(all_db_con, 'sisetukijun_all_update_date') %>% 
   distinct(update_date) %>% 
   collect() %>% 
+  filter(update_date>='2024-08-01') %>% 
   arrange(update_date) %>%
   print()
 
@@ -282,8 +244,8 @@ for (select_date in update_dates$update_date){
       ,FAX番号=''
       ,病床数=''
     )) %>% 
-    distinct() %>% 
     collect() %>% 
+    distinct() %>% 
     glimpse()
   
   # 厚生局コードに変換
@@ -380,8 +342,10 @@ for (select_date in update_dates$update_date){
 
 # 厚生局ごとにいつのデータが入っているかのデータを作る
 mst_kouseikyoku_update_date <- tbl(con,'sisetu_main') %>% 
-  distinct(厚生局コード,update_date) %>% 
+  group_by(厚生局コード,update_date) %>% 
+  summarise(tmp=1) %>% # collectの前にdistinctするとarrangeのwarningが発生するのでgroup_byとsummariceに変更
   collect() %>% 
+  select(厚生局コード,update_date) %>% 
   arrange(厚生局コード,update_date) %>%
   print()
 
@@ -392,8 +356,8 @@ DBI::dbWriteTable(con, 'mst_kouseikyoku_update_date', mst_kouseikyoku_update_dat
 
 # 厚生局ごとの最新update_dateのsisetu_mainを作成
 latest_sisetu_main <- tbl(con, 'mst_kouseikyoku_update_date') %>% 
-  arrange(厚生局コード,desc(update_date)) %>% 
-  distinct(厚生局コード,.keep_all=T) %>%
+  group_by(厚生局コード) %>% 
+  summarise(update_date = max(update_date,na.rm=T)) %>% 
   inner_join(tbl(con,'sisetu_main'),by=c('update_date','厚生局コード')) %>% 
   collect() %>%
   print()
@@ -430,17 +394,33 @@ DBI::dbWriteTable(con, 'latest_todokede', latest_todokede, overwrite=T) %>% prin
 agg_get_date <- tbl(all_db_con,'sisetukijun_all_get_date') %>% 
   distinct(get_date,update_date,厚生局) %>% 
   collect() %>% 
+  filter(update_date>='2024-08-01') %>% 
   left_join(mst_kouseikyoku,by=c('厚生局')) %>% 
+  print()
+
+# 採用フラグを作成
+agg_saiyou_get_date <- agg_get_date %>% 
+  group_by(厚生局,update_date) %>% 
+  mutate(採用 = as.numeric(get_date==max(get_date))) %>% 
+  ungroup() %>% 
+  group_by(get_date) %>% 
+  summarise(採用 = max(採用,na.rm=T)) %>% 
   print()
 
 # 横長のexcel
 agg_wide_get_date <- agg_get_date %>% 
-  arrange(厚生局コード,get_date,update_date) %>% 
+  arrange(厚生局コード) %>% 
   pivot_wider(
     id_cols=get_date
     ,names_from=厚生局
     ,values_from=update_date
   ) %>% 
+  arrange(get_date) %>% 
+  print()
+
+# 採用フラグを結合
+agg_wide_get_date <- agg_wide_get_date %>% 
+  left_join(agg_saiyou_get_date,by='get_date') %>% 
   print()
 
 ################################################################################
@@ -453,7 +433,8 @@ update_notice <- agg_get_date %>%
   ungroup() %>% 
   group_by(get_date) %>% 
   mutate(update_count = sum(update)) %>% 
-  ungroup()
+  ungroup() %>% 
+  print()
 
 # 更新メッセージを作成
 update_notice <- update_notice %>% 
@@ -506,3 +487,4 @@ if (file.exists(src_path)) {
 }
 
 ################################################################################
+
