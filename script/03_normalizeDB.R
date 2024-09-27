@@ -131,6 +131,7 @@ DBI::dbWriteTable(con, 'mst_syubetu', mst_syubetu, overwrite=T) %>% print()
 # 届出マスタを作成
 mst_todokede <- tbl(all_db_con, 'sisetukijun_all_update_date') %>%
   distinct(受理届出名称) %>%
+  filter(!is.na(受理届出名称)) %>% 
   collect() %>% 
   arrange(受理届出名称) %>%
   rowid_to_column('受理届出コード') %>%
@@ -477,22 +478,4 @@ DBI::dbDisconnect(con)
 
 ################################################################################
 
-# sisetukijun.duckdbをfacility-standardsにcopy
-src_path <- '/home/rstudio/srv/project/sisetukijun/sisetukijun.duckdb'
-dst_path <- '/home/rstudio/srv/shinyapps/facility-standards/sisetukijun.duckdb'
-
-# ファイルコピーを試みる
-if (file.exists(src_path)) {
-  success <- file.copy(src_path, dst_path, overwrite = TRUE)
-  
-  if (success) {
-    message(str_glue("{src_path}を{dst_path}にコピーしました"))
-  } else {
-    message(str_glue("{src_path}のコピーに失敗しました。"))
-  }
-} else {
-  message("コピー元のファイルが見つかりません: ", src_path)
-}
-
-################################################################################
 
