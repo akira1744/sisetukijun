@@ -7,6 +7,7 @@ pacman::p_load(
   ,lubridate
   ,duckdb
   ,duckplyr
+  ,arrow
   ,tidyverse
   ,tidylog
 )
@@ -15,7 +16,7 @@ output_dir <- here('output') %>% print()
 
 ################################################################################
 
-# すべてのrdsを格納するdb
+# すべてのparquetを格納するdb
 all_db_path <- 'sisetukijun_all.duckdb'
 
 # connect
@@ -57,6 +58,7 @@ sample %>% names() %>% dput()
 # update_dateのマスタを作成する
 mst_update_date <- tbl(all_db_con, 'sisetukijun_all_update_date') %>% 
   distinct(update_date,厚生局) %>% 
+  filter(update_date>='2024-08-01') %>% 
   collect() %>% 
   arrange(update_date) %>%
   print()
@@ -450,12 +452,18 @@ update_notice <- update_notice %>%
 
 system("sudo chmod 666 更新状況.xlsx")
 
+update_notice %>% 
+  write_csv('output/更新通知.csv')
+
+agg_wide_get_date %>% 
+  write_csv('output/厚生局別get_date_update_date.csv')
+
 # 厚生局別_update_date一覧を出力
-list(
-  '更新通知'=update_notice
-  ,'厚生局別get_date_update_date一覧'=agg_wide_get_date
-  ) %>% 
-  writexl::write_xlsx('更新状況.xlsx')
+# list(
+#   '更新通知'=update_notice
+#   ,'厚生局別get_date_update_date一覧'=agg_wide_get_date
+#   ) %>% 
+#   writexl::write_xlsx('更新状況.xlsx')
 
 
 # update_noticeをdbに書き込み

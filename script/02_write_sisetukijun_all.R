@@ -5,6 +5,7 @@ pacman::p_load(
   ,DBI
   ,writexl
   ,lubridate
+  ,arrow
   ,duckdb
   ,duckplyr
   ,tidyverse
@@ -15,7 +16,7 @@ pacman::p_load(
 
 output_dir <- here('output') %>% print()
 
-# すべてのrdsを格納するdb
+# すべてのparquetを格納するdb
 all_db_path <- 'sisetukijun_all.duckdb'
 
 # すべてのget_dateのdataを格納するDBを用意
@@ -33,7 +34,7 @@ all_db_tables <- DBI::dbListTables(all_db_con) %>% print()
 target_files <- list.files(
   output_dir
   ,full.names = TRUE
-  ,pattern = 'df_all.rds'
+  ,pattern = 'df_all.parquet'
   ,recursive = TRUE
   ) %>% 
   print()
@@ -61,8 +62,8 @@ print(target_files)
 
 # filesを1つずつ読み込んでdbに書き込む
 for(file in target_files){
-  # rdsを読み込み
-  df_all <- readRDS(file)
+  # parquetを読み込み
+  df_all <- read_parquet(file)
   
   # 日付型を文字列に変換
   df_all <- df_all %>% 

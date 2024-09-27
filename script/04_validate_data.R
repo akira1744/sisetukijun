@@ -6,16 +6,17 @@ pacman::p_load(
   ,duckdb
   ,duckplyr
   ,writexl
+  ,arrow
   ,lubridate
   ,tidyverse
-  # ,tidylog
+  ,tidylog
 )
 
 output_dir <- here('output') %>% print()
 
 ################################################################################
 
-# すべてのrdsを格納するdb
+# すべてのparquetを格納するdb
 all_db_path <- here('sisetukijun_all.duckdb') %>% print()
 
 # connect

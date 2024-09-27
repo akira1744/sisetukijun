@@ -6,6 +6,7 @@ pacman::p_load(
   ,httr
   ,openxlsx
   ,zipangu
+  ,arrow
   ,tidyverse
   ,tidylog
 )
@@ -16,8 +17,8 @@ pacman::p_load(
 today_ymd <- str_replace_all(Sys.Date(),'-','') %>% print()
 output_dir <- here(str_glue('output/{today_ymd}')) %>% print()
 
-# TODO 手動でrds出力をやりなおしする場合はコメントアウト
-# output_dir <- 'output/20240907'
+# TODO 手動でparquet出力をやりなおしする場合はコメントアウト
+# output_dir <- 'output/20240829'
 
 # 書き込み権限を変更
 system(paste("sudo chmod -R 777", output_dir))
@@ -88,7 +89,6 @@ df_all <- df_all %>%
     ,T  ~ 算定開始年月日
   )) 
 
-
 ################################################################################
 
 # 算定開始年月日を西暦に変換
@@ -157,7 +157,6 @@ df_all <- df_all %>%
 # pref_update_date %>% 
 #   writexl::write_xlsx(str_glue('{output_dir}/pref_update_date.xlsx'))
 
-
 ################################################################################
 
 # # 厚生局ごとに最大の算定開始年月日を計算して出力
@@ -176,13 +175,13 @@ kouseikyoku_update_date %>%
 df_all <- df_all %>% 
   left_join(kouseikyoku_update_date, by = c('厚生局')) 
 
-# 生成物をrds出力
-title <- str_glue('{output_dir}/df_all.rds')
-df_all %>% saveRDS(title)
+# 生成物をparquet出力
+title <- str_glue('{output_dir}/df_all.parquet')
+df_all %>% write_parquet(title)
 message(str_glue('出力完了: {title}'))
 
 ################################################################################
 
 print(data.frame(kouseikyoku_update_date))
 
-message('01.1_make_df_all_rds.Rが終了しました')
+message('01.1_make_df_all_parquet.Rが終了しました')
