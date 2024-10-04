@@ -353,7 +353,6 @@ mst_todokede <- mst_todokede %>%
 # mst_todokedeをoverwrite
 dbWriteTable(con,'mst_todokede',mst_todokede,overwrite=T)
 
-
 ################################################################################
 
 DBI::dbDisconnect(con)
