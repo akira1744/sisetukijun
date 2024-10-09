@@ -27,7 +27,8 @@ source('script/01.1_make_df_all_parquet.R', echo=TRUE)
 source('script/02_write_sisetukijun_all.R', echo=TRUE)
 source('script/03_normalizeDB.R', echo=TRUE)
 source('script/04_sisetsu_kijun_master.R', echo=TRUE)
-source('script/05_validate_data.R', echo=TRUE)
+source('script/05_make_sisetu_bed_table.R', echo=TRUE)
+source('script/10_validate_data.R', echo=TRUE)
 
 message('すべての処理が完了しました')
 

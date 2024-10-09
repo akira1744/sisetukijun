@@ -39,3 +39,4 @@ db_tables <- DBI::dbListTables(con) %>% print()
 
 tbl(con,'mst_update_date')
 
+tbl(con,'sisetu_bed')

@@ -451,21 +451,11 @@ update_notice <- update_notice %>%
   distinct(get_date,message) %>% 
   print()
 
-system("sudo chmod 666 更新状況.xlsx")
-
 update_notice %>% 
   write_csv('output/更新通知.csv')
 
 agg_wide_get_date %>% 
   write_csv('output/厚生局別get_date_update_date.csv')
-
-# 厚生局別_update_date一覧を出力
-# list(
-#   '更新通知'=update_notice
-#   ,'厚生局別get_date_update_date一覧'=agg_wide_get_date
-#   ) %>% 
-#   writexl::write_xlsx('更新状況.xlsx')
-
 
 # update_noticeをdbに書き込み
 DBI::dbWriteTable(con, 'update_notice', update_notice, overwrite=T) %>% print()
