@@ -460,6 +460,39 @@ agg_wide_get_date %>%
 # update_noticeをdbに書き込み
 DBI::dbWriteTable(con, 'update_notice', update_notice, overwrite=T) %>% print()
 
+DBI::dbWriteTable(con, 'update_dates', agg_wide_get_date, overwrite=T) %>% print()
+
+################################################################################
+
+# update_dateエラー検出
+
+# script:00.2で作成した更新日を読み込み
+org_update_dates <- read_csv('output/更新日.csv') %>% print()
+
+org_update_date_long <- org_update_dates %>% 
+  pivot_longer(-date,names_to='厚生局',values_to='org_update_date') %>% 
+  mutate(org_update_date = str_replace(org_update_date,'現在','')) %>% 
+  mutate(org_update_date = convert_jdate(org_update_date)) %>%
+  rename(get_date = date) %>% 
+  print()
+
+agg_get_date <- agg_get_date %>% 
+  mutate(get_date=ymd(get_date)) %>% 
+  mutate(update_date = ymd(update_date)) %>% 
+  select(-厚生局コード) %>% 
+  print()
+
+check_update_date <- org_update_date_long %>% 
+  left_join(agg_get_date,by=c('get_date','厚生局')) %>% 
+  filter(is.na(update_date)) %>% 
+  print()
+
+# 更新日エラーがあったら出力
+if(nrow(check_update_date)>0){
+  check_update_date %>% 
+    write_csv('output/update_dateエラー.csv')
+}
+
 ################################################################################
 
 # 切断

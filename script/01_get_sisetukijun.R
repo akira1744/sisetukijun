@@ -21,16 +21,16 @@ original_dir <- here(str_glue('{output_dir}/original')) %>% print()
 # 書き込み権限を変更
 system(paste("sudo chmod -R 777", output_dir))
 
-# 初期化
-if (dir.exists(output_dir)){
-  # output_dirを一旦削除して初期化
-  unlink(output_dir, recursive = TRUE)
-}
-
-# original_dirをrecursiveで作成
-if (!dir.exists(original_dir)) {
-  dir.create(original_dir,recursive = TRUE)
-}
+# # 初期化
+# if (dir.exists(output_dir)){
+#   # output_dirを一旦削除して初期化
+#   unlink(output_dir, recursive = TRUE)
+# }
+# 
+# # original_dirをrecursiveで作成
+# if (!dir.exists(original_dir)) {
+#   dir.create(original_dir,recursive = TRUE)
+# }
 
 ################################################################################
 
@@ -43,12 +43,17 @@ df_kouseikyoku <- dplyr::tibble(
     "https://kouseikyoku.mhlw.go.jp/shikoku/gyomu/gyomu/hoken_kikan/shitei/index.html",
     "https://kouseikyoku.mhlw.go.jp/kinki/gyomu/gyomu/hoken_kikan/shitei_jokyo_00004.html",
     "https://kouseikyoku.mhlw.go.jp/chugokushikoku/chousaka/shisetsukijunjuri.html"),
-  contains_jp = c("Excel（ZIP）", "医科（ZIP）", "（ZIP）", "（ZIP）", "各県全体（ZIP）")) |> 
+  contains_jp = c("Excel（ZIP）", "医科（ZIP）", "（ZIP）", "（ZIP）", "各県全体")) |> 
     mutate(a_con = str_c("a:contains('", contains_jp, "')")) %>% 
   glimpse()
 
 #東北、関東信越、近畿、中国、四国の関数
 get_sisetukijun1<- function(district, url, a_contains){
+  
+  
+  # district <- '中国'
+  # url <- "https://kouseikyoku.mhlw.go.jp/chugokushikoku/chousaka/shisetsukijunjuri.html"
+  # a_contains <- "a:contains('各県全体')"
   
   output_dir1 <- str_glue('{original_dir}/{district}') 
   
@@ -58,7 +63,9 @@ get_sisetukijun1<- function(district, url, a_contains){
   
   # ウェブページを読み込み、必要なリンクを抽出します
   web_page <- read_html(url)
+  
   links <- web_page %>% html_nodes(a_contains) %>% html_attr("href")
+  links
   
   # ベースURLを定義します
   base_url <- "https://kouseikyoku.mhlw.go.jp"
@@ -260,12 +267,26 @@ url <- "https://kouseikyoku.mhlw.go.jp/kyushu/gyomu/gyomu/hoken_kikan/index_0000
 
 # ウェブページを読み込み、必要なリンクを抽出します
 web_page <- read_html(url)
+web_page
 links <- web_page %>% html_nodes("a:contains('エクセルデータ（ZIP）')") %>% html_attr("href")
+links
 
-# 最新ファイル判定のための正規表現を作成
-latest_prefix <- max(gsub("^.*/([^_]+_[0-9]+)_.*$", "\\1", links))
+# before #######################################################################
 
-latest_prefix
+# # 最新ファイル判定のための正規表現を作成
+# latest_prefix <- max(gsub("^.*/([^_]+_[0-9]+)_.*$", "\\1", links))
+# latest_prefix
+# 
+# # 最新のリンクのみを抽出してダウンロード
+# latest_links <- links[grepl(paste0(latest_prefix), links)]
+# latest_links
+
+# after ########################################################################
+
+latest_links <- links[1:8]
+latest_links
+
+################################################################################
 
 # ダウンロードディレクトリを設定します
 download_dir <- "downloads"
@@ -273,9 +294,6 @@ if (!dir.exists(download_dir)) {
   dir.create(download_dir)
 }
 
-# 最新のリンクのみを抽出してダウンロード
-latest_links <- links[grepl(paste0(latest_prefix), links)]
-  
 for (link in latest_links) {
   zip_url <- paste0("https://kouseikyoku.mhlw.go.jp", link)
   zip_filename <- basename(zip_url)
@@ -303,12 +321,15 @@ if (!dir.exists(output_dir4)) {
   dir.create(output_dir4)
 }
 
+# str_c(latest_prefix, ".*_ika_.*\\.xlsx$")
+
 # ダウンロードしたZIPファイルを解凍し、条件に合うファイルを移動します
 zip_files <- list.files(download_dir, pattern = "\\.zip$", full.names = TRUE)
 for (zip_file in zip_files) {
   unzip(zip_file, exdir = unzip_dir)
   files <- list.files(unzip_dir,
-     pattern = str_c(latest_prefix, ".*_ika_.*\\.xlsx$"), full.names = TRUE)
+     # pattern = str_c(latest_prefix, ".*_ika_.*\\.xlsx$"), full.names = TRUE)
+      pattern = "_ika_.*\\.xlsx$", full.names = TRUE)
   if (length(files) > 0) {
     file.copy(files, output_dir4, overwrite = TRUE) 
   }
