@@ -18,7 +18,7 @@ today_ymd <- str_replace_all(Sys.Date(),'-','') %>% print()
 output_dir <- here(str_glue('output/{today_ymd}')) %>% print()
 
 # TODO 手動でparquet出力をやりなおしする場合はコメントアウト
-# output_dir <- 'output/20241110'
+# output_dir <- 'output/20241123'
 
 # 書き込み権限を変更
 system(paste("sudo chmod -R 777", output_dir))
@@ -100,6 +100,8 @@ df_all <- df_file %>%
   unnest(cols = c(data)) 
 
 df_all %>% glimpse()
+
+df_all
 
 # 算定開始日の不正データを発見→厚生局に問い合わせをしたら2024/7/1版で修正するとのこと。
 # 2024/6/1版は手直しするしかなくなった。

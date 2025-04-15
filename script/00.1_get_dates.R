@@ -45,11 +45,21 @@ get_kousin_date <- function(url,district){
     html_text()
   
   # 東海北陸と中国の場合は最初に出てきた日付形式のものを抽出
-  if(district %in% c("東海北陸","中国")){
+  if(district %in% c('北海道','東北',"東海北陸",'四国',"中国")){
     kousin_date <-  texts %>% 
       str_subset(date_pattern) %>% 
       str_extract(date_pattern) %>%
       head(1) 
+    
+  }else if(district == '近畿'){
+    # 令和6年12月4日
+    gengo_date_pattern <- "令和\\d{1,2}年\\d{1,2}月\\d{1,2}日"
+    kousin_date <-  texts %>% 
+      str_subset(gengo_date_pattern) %>% 
+      str_extract(gengo_date_pattern) %>% 
+      head(1) %>% 
+      convert_jdate()
+    
   }else{
     # その他地区の場合は「更新日」が含まれるテキストを抽出
     kousin_date <- texts %>% 
@@ -110,6 +120,16 @@ urls <- dplyr::tibble(
   )
 ) 
 
+# get_kousin_date("https://kouseikyoku.mhlw.go.jp/hokkaido/gyomu/gyomu/hoken_kikan/todokede_juri_ichiran.html","北海道")
+# get_kousin_date("https://kouseikyoku.mhlw.go.jp/tohoku/gyomu/gyomu/hoken_kikan/documents/201805koushin.html","東北")
+# get_kousin_date("https://kouseikyoku.mhlw.go.jp/kantoshinetsu/chousa/kijyun.html","関東信越")
+# get_kousin_date("https://kouseikyoku.mhlw.go.jp/tokaihokuriku/newpage_00349.html","東海北陸")
+# get_kousin_date("https://kouseikyoku.mhlw.go.jp/shikoku/gyomu/gyomu/hoken_kikan/shitei/index.html","四国")
+# get_kousin_date("https://kouseikyoku.mhlw.go.jp/kinki/gyomu/gyomu/hoken_kikan/shitei_jokyo_00004.html","近畿")
+# get_kousin_date("https://kouseikyoku.mhlw.go.jp/chugokushikoku/chousaka/shisetsukijunjuri.html","中国")
+# get_kousin_date("https://kouseikyoku.mhlw.go.jp/kyushu/gyomu/gyomu/hoken_kikan/index_00007.html","九州")
+# 
+
 # kousin_dateを取得
 urls <- urls %>% 
   mutate(kousin_date = map2_chr(url,kousei,~get_kousin_date(.x,.y))) 
@@ -123,13 +143,15 @@ urls <- urls %>%
 
 # 現在時刻の付与
 now <- Sys.time()
+
 urls <- urls %>%
-  mutate(date = as.Date(now)) %>% 
+  mutate(date = ymd(Sys.Date())) %>% 
   mutate(time  = str_glue("{hour(now)}{minute(now)}")) 
   
 # 列整理
 urls <- urls %>% 
   select(date,time,kousei,kousin_date,update_date) 
+
 
 # データの保存
 urls %>% 

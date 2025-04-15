@@ -29,12 +29,14 @@ urls <- tribble(
   '特掲診療料', "https://kouseikyoku.mhlw.go.jp/kantoshinetsu/shinsei/shido_kansa/shitei_kijun/tokukei_shinryo_r06.html",
 ) %>% 
   print()
-  
+
 # urlからtableを抽出するための関数
 read_sisetukijun_mst_from_url<- function(url){
   
   # SSLエラーを回避するための設定
   set_config(config(ssl_verifypeer = 0L))
+  
+  url
   
   # urlからpageを読み込み
   webpage <- rvest::read_html(url)
@@ -44,8 +46,15 @@ read_sisetukijun_mst_from_url<- function(url){
     rvest::html_nodes("table.datatable") %>%
     rvest::html_table()
   
+  # webpage %>% html_nodes("body") %>% html_text()
+  # webpage %>% html_nodes("table") %>% html_attr("class")
+  
+  tables<- webpage %>% html_nodes(xpath = "//table") %>% html_table()
+
+  tables
+  
   # 1つのurlにtableが2つあるので2つ目を使う
-  table <- tables[[2]]
+  table <- tables[[3]]
   
   # 1列目と2列目だけを使う
   table <- table %>% 
@@ -74,6 +83,9 @@ df <- urls %>%
   select(source, data) %>% 
   unnest(cols = c(data)) %>% 
   print()
+
+# df %>% head(5)
+# df %>% tail(5)
 
 ################################################################################
 

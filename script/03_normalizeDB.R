@@ -5,6 +5,7 @@ pacman::p_load(
   ,DBI
   ,writexl
   ,lubridate
+  ,zipangu
   ,duckdb
   ,duckplyr
   ,arrow
@@ -472,7 +473,7 @@ org_update_dates <- read_csv('output/更新日.csv') %>% print()
 org_update_date_long <- org_update_dates %>% 
   pivot_longer(-date,names_to='厚生局',values_to='org_update_date') %>% 
   mutate(org_update_date = str_replace(org_update_date,'現在','')) %>% 
-  mutate(org_update_date = convert_jdate(org_update_date)) %>%
+  mutate(org_update_date = zipangu::convert_jdate(org_update_date)) %>%
   rename(get_date = date) %>% 
   print()
 
